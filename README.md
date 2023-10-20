@@ -4,14 +4,10 @@
 
 ## 框架
 1. 原始cbct重建demo：生成phantom，生成投影，进程重建  
-phantom.py —— 预先设定的长方体模型  
-
-astra_cone.py —— 3d geometry设置为cone的实现（只支持xray，target，detector在一个平面的情况），结果在output中  
-
-astra_cone_vec.py —— 3d geometry设置为cone_vec的实现，对预置长方体模型的重建，可以自定义投影矩阵（12*1），结果在output1中  
-
-
-3. 对实验数据的重建
+   phantom.py —— 预先设定的长方体模型  
+   astra_cone.py —— 3d geometry设置为cone的实现（只支持xray，target，detector在一个平面的情况），结果在output中  
+   astra_cone_vec.py —— 3d geometry设置为cone_vec的实现，对预置长方体模型的重建，可以自定义投影矩阵（12*1），结果在output1中  
+2. 对实验数据的重建  
 astra_cone_vec2.py —— 根据具体数据设置投影矩阵重建，结果在output3中  
 
 ## 进展

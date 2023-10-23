@@ -14,41 +14,83 @@ import phantom as pm
 PROJECTION_RESULTS = r'output2/data'
 RECONSTRUCTION_RESULTS = 'output2/reconstruction'
 
-File = r"D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e4\3DReconLog_e4_23\Run76\Cal.txt"
-X_INIT = 3096
-Y_INIT = 3104
 
-# list1 = []
-# try:
-#     file = open(File, 'r')
-# except FileNotFoundError:
-#     print('File is not found')
-# else:
-#     lines = file.readlines()
-#     flag = 0
-#     for line in lines:
-#         a = line.split()
-#         if a:
-#             if a[0] == "1":
-#                 flag = 1
-#             if flag:
-#                 x = int(a[13].split(".")[0]) / 1000
-#                 y = int(a[14].split(".")[0]) / 1000
-#                 z = int(a[15].split(".")[0]) / 1000
-#                 # print(x,y,z)
-#                 if y != 0:
-#                     theta = math.atan2(y, x) * 180 / math.pi
-#                 else:
-#                     if x == 0:
-#                         theta = 0
-#                     elif x > 0:
-#                         theta = 90
-#                     else:
-#                         theta = -90
-#                 dist = x ** 2 + y ** 2 + z ** 2
-#                 list1.append([theta, dist])
-#
-# file.close()
+File = r"data/e5\Cal.txt"
+
+n = 120
+slices = 200
+r = 6
+resolution = 0.099
+
+vectors = np.zeros((n, 12))
+try:
+    file = open(File, 'r')
+except FileNotFoundError:
+    print('File is not found')
+else:
+    lines = file.readlines()
+    flag = 0
+    i = 0
+    for line in lines:
+        a = line.split()
+        if a:
+            if a[0] == "1":
+                flag = 1
+            if flag:
+                z_source = int(a[9].split(".")[0]) / 1000
+
+                x = int(a[13].split(".")[0]) / 1000
+                y = int(a[14].split(".")[0]) / 1000
+                z = int(a[15].split(".")[0]) / 1000
+
+                x_source = x * z_source / z
+                y_source = y * z_source / z
+
+                theta2 = (math.pi / 2 - math.atan2(math.sqrt(x ** 2 + y ** 2), -z))
+                # ry = [[math.cos(theta2), 0, math.sin(theta2)],
+                #       [0, 1, 0],
+                #       [-math.sin(theta2), 0, math.cos(theta2)]]
+                # rx = [[1, 0, 0],
+                #       [0, math.cos(theta2), -math.sin(theta2)],
+                #       [0, math.sin(theta2), math.cos(theta2)]]
+                # rz = [[math.cos(theta2), -math.sin(theta2), 0],
+                #       [math.sin(theta2), math.cos(theta2), 0],
+                #       [0, 0, 1]]
+                # rx = np.array(rx)
+                # ry = np.array(ry)
+                # rz = np.array(rz)
+
+                vectors[i][3] = -y
+                vectors[i][4] = -x
+                vectors[i][5] = z
+
+                theta = math.atan2(abs(vectors[i][4]), abs(vectors[i][3]))
+
+                vectors[i][0] = -y_source
+                vectors[i][1] = -x_source
+                vectors[i][2] = z_source
+
+                vectors[i][9] = resolution * r  # math.cos(theta) * vectors[i][3] / abs(vectors[i][3]) * resolution * 6 #resolution * 6
+                vectors[i][10] = 0  # math.sin(theta) * vectors[i][4] / abs(vectors[i][4]) * resolution * 6 #resolution * 6
+                vectors[i][11] = 0
+
+                vectors[i][6] = vectors[i][10]
+                vectors[i][7] = -vectors[i][9]
+                vectors[i][8] = 0
+                # vectors[i][6] = vectors[i][7] = 0.099
+                # vectors[i][11] = 0.099
+                # print(vectors[0])
+
+                # [vectors[i][3], vectors[i][4], vectors[i][5]] = np.matmul(ry.T, np.array([vectors[i][3], vectors[i][4], vectors[i][5]]))
+                # [vectors[i][0], vectors[i][1], vectors[i][2]] = np.matmul(ry.T, np.array([vectors[i][0], vectors[i][1], vectors[i][2]]))
+                # [vectors[i][6], vectors[i][7], vectors[i][8]] = np.matmul(ry.T, np.array([vectors[i][6], vectors[i][7], vectors[i][8]]))
+                # [vectors[i][9], vectors[i][10], vectors[i][11]] = np.matmul(ry.T, np.array([vectors[i][9], vectors[i][10], vectors[i][11]]))
+
+                i += 1
+                print(i)
+
+
+file.close()
 
 
 # exit()
@@ -69,7 +111,7 @@ class Virtual_Cbct():
         self.pixelSize = 1.05  # [mm]
         self.detectorRows = 200  # Vertical size of detector [pixels].
         self.detectorColumns = 200  # Horizontal size of detector [pixels].
-        self.numberOfProjections = 180
+        self.numberOfProjections = n
         self.phantomGenerator = pm.PhantomGenerator()
 
     def start_run(self, phantom):
@@ -97,18 +139,21 @@ class Virtual_Cbct():
             #
             # self.vectors[i][11] = self.pixelSize
 
-            self.vectors[i][0] = math.sin(self.angles[i]) * self.distanceFromSourceToOrigin
-            self.vectors[i][1] = -math.cos(self.angles[i]) * self.distanceFromSourceToOrigin
-            self.vectors[i][2] = 0
+            self.vectors[i][0] = math.sin(self.angles[i]) * 30.5
+            self.vectors[i][1] = -math.cos(self.angles[i]) * 30.5
+            self.vectors[i][2] = 70.9  # self.distanceFromSourceToOrigin
 
-            self.vectors[i][3] = -math.sin(self.angles[i]) * self.distanceFromOriginToDetector
-            self.vectors[i][4] = math.cos(self.angles[i]) * self.distanceFromOriginToDetector
-            self.vectors[i][5] = 0
+            self.vectors[i][3] = -math.sin(self.angles[i]) * 159
+            self.vectors[i][4] = math.cos(self.angles[i]) * 159
+            self.vectors[i][5] = -370  # -self.distanceFromOriginToDetector
 
-            self.vectors[i][6] = math.cos(self.angles[i]) * self.pixelSize
-            self.vectors[i][7] = math.sin(self.angles[i]) * self.pixelSize
+            self.vectors[i][6] = 0
+            self.vectors[i][7] = 2
 
-            self.vectors[i][11] = self.pixelSize
+            self.vectors[i][9] = 2
+            self.vectors[i][10] = 0
+
+        # self.vectors = vectors
 
         self.projectionGeometry = astra.create_proj_geom(
             'cone_vec',
@@ -182,7 +227,7 @@ class Virtual_Cbct():
         # Create reconstruction.
         reconstruction_id = astra.data3d.create('-vol', self.vol_geom, data=0)
 
-        alg_cfg = astra.astra_dict('FDK_CUDA')
+        alg_cfg = astra.astra_dict('SIRT3D_CUDA')
         alg_cfg['ProjectionDataId'] = projectionId
         alg_cfg['ReconstructionDataId'] = reconstruction_id
         algorithm_id = astra.algorithm.create(alg_cfg)

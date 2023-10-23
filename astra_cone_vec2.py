@@ -8,8 +8,7 @@ from imageio import get_writer, imread, imwrite
 import astra
 import math
 
-
-# PROJECTION_RESULTS = r'D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e4\3DReconLog_e4_23\data\resize(8)'
+# PROJECTION_RESULTS = r'D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e5\3DReconLog_e5_120\Run1'
 # File = r"D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e4\3DReconLog_e4_23\Run76\Cal.txt"
 
 PROJECTION_RESULTS = r'data/e5'
@@ -17,10 +16,12 @@ File = r"data/e5\Cal.txt"
 
 RECONSTRUCTION_RESULTS = 'output3/reconstruction'
 
-X_INIT = 3096
-Y_INIT = 3104
+X_INIT = 500  # 3096
+Y_INIT = 500  # 3104
 n = 120
 slices = 200
+r = 6
+resolution = 0.099
 
 vectors = np.zeros((n, 12))
 try:
@@ -46,25 +47,45 @@ else:
                 x_source = x * z_source / z
                 y_source = y * z_source / z
 
+                theta2 = (math.pi / 2 - math.atan2(math.sqrt(x ** 2 + y ** 2), -z))
+                ry = [[math.cos(theta2), 0, math.sin(theta2)],
+                      [0, 1, 0],
+                      [-math.sin(theta2), 0, math.cos(theta2)]]
+                rx = [[1, 0, 0],
+                      [0, math.cos(theta2), -math.sin(theta2)],
+                      [0, math.sin(theta2), math.cos(theta2)]]
+                rz = [[math.cos(theta2), -math.sin(theta2), 0],
+                      [math.sin(theta2), math.cos(theta2), 0],
+                      [0, 0, 1]]
+                rx = np.array(rx)
+                ry = np.array(ry)
+                rz = np.array(rz)
+
                 vectors[i][3] = -y
                 vectors[i][4] = -x
                 vectors[i][5] = z
+
+                theta = math.atan2(abs(vectors[i][4]), abs(vectors[i][3]))
+
                 vectors[i][0] = -y_source
                 vectors[i][1] = -x_source
                 vectors[i][2] = z_source
 
-                theta = math.atan2(abs(vectors[i][4]), abs(vectors[i][3]))
-                theta2 = math.atan2(math.sqrt(x**2+y**2), z)
-
-                vectors[i][9] = math.cos(theta) * vectors[i][3] / abs(vectors[i][3]) * 0.016*6
-                vectors[i][10] = math.sin(theta) * vectors[i][4] / abs(vectors[i][4])* 0.016*6
+                vectors[i][9] = resolution * r#math.cos(theta) * vectors[i][3] / abs(vectors[i][3]) * resolution * 6 #resolution * 6
+                vectors[i][10] = 0#math.sin(theta) * vectors[i][4] / abs(vectors[i][4]) * resolution * 6 #resolution * 6
                 vectors[i][11] = 0
 
-                vectors[i][6] = -vectors[i][10]
-                vectors[i][7] = vectors[i][9]
+                vectors[i][6] = vectors[i][10]
+                vectors[i][7] = -vectors[i][9]
                 vectors[i][8] = 0
                 # vectors[i][6] = vectors[i][7] = 0.099
                 # vectors[i][11] = 0.099
+                # print(vectors[0])
+
+                # [vectors[i][3], vectors[i][4], vectors[i][5]] = np.matmul(ry.T, np.array([vectors[i][3], vectors[i][4], vectors[i][5]]))
+                # [vectors[i][0], vectors[i][1], vectors[i][2]] = np.matmul(ry.T, np.array([vectors[i][0], vectors[i][1], vectors[i][2]]))
+                # [vectors[i][6], vectors[i][7], vectors[i][8]] = np.matmul(ry.T, np.array([vectors[i][6], vectors[i][7], vectors[i][8]]))
+                # [vectors[i][9], vectors[i][10], vectors[i][11]] = np.matmul(ry.T, np.array([vectors[i][9], vectors[i][10], vectors[i][11]]))
 
                 i += 1
                 print(i)
@@ -78,10 +99,10 @@ class Virtual_Cbct():
     def __init__(self):
         # Configuration.
         self.distanceFromSourceToOrigin = 70.9  # [mm]
-        self.distanceFromOriginToDetector = 371  # [mm]
-        self.pixelSize = 0.099 * 6  # [mm]
-        self.detectorRows = 500  # Vertical size of detector [pixels].
-        self.detectorColumns = 500  # Horizontal size of detector [pixels].
+        self.distanceFromOriginToDetector = 370  # [mm]
+        self.pixelSize = resolution * 6  # [mm]
+        self.detectorRows = Y_INIT  # Vertical size of detector [pixels].
+        self.detectorColumns = X_INIT  # Horizontal size of detector [pixels].
         self.numberOfProjections = n
 
         # Configuration.
@@ -186,7 +207,7 @@ class Virtual_Cbct():
         # Create reconstruction.
         reconstruction_id = astra.data3d.create('-vol', self.vol_geom, data=0)
 
-        alg_cfg = astra.astra_dict('FDK_CUDA')
+        alg_cfg = astra.astra_dict('SIRT3D_CUDA')
         alg_cfg['ProjectionDataId'] = projectionId
         alg_cfg['ReconstructionDataId'] = reconstruction_id
         algorithm_id = astra.algorithm.create(alg_cfg)

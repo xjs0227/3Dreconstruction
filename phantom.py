@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 class PhantomGenerator():
 	def __init__(self):
 		self.thickness = 5
-		self.height = 110
+		self.height = 20
 		self.width = 40
 		self.shellAttenuation = 1
 		self.cavityAttenuation = 0.5

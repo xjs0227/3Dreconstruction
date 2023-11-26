@@ -4,6 +4,8 @@ import shutil
 import numpy as np
 from os.path import join
 from imageio import get_writer, imread, imwrite
+import cv2
+import time
 
 import astra
 import math
@@ -11,22 +13,25 @@ import math
 # PROJECTION_RESULTS = r'D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e5\3DReconLog_e5_120\Run1'
 # File = r"D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e4\3DReconLog_e4_23\Run76\Cal.txt"
 
-PROJECTION_RESULTS = r'data/e5'
-File = r"data/e5\Cal.txt"
+PROJECTION_RESULTS = "/home/hui/xjs/data/Run-partmokuai/3DReconLog-mokuai-60/Run1" # '/home/hui/xjs/data/3DReconLog_e5_120/Run1' # "data/e5"  # 
+File = "/home/hui/xjs/data/Run-partmokuai/3DReconLog-mokuai-60/Run1/Cal.txt" #"data/e5/Cal.txt"
 
-RECONSTRUCTION_RESULTS = 'output3/reconstruction'
+RECONSTRUCTION_RESULTS = "results/Run-partmokuai/3DReconLog-mokuai-60"
 
-X_INIT = 500  # 3096
-Y_INIT = 500  # 3104
-n = 120
-slices = 200
-r = 6
-resolution = 0.099
+t1 = time.time()
+scale = 6
+X_INIT = 3096
+Y_INIT = 3104
+n = 60
+slices = 100
+r = 3.5
+resolution = 0.99
+iteration = 5
 
 vectors = np.zeros((n, 12))
 try:
     file = open(File, 'r')
-except FileNotFoundError:
+except FileNotFoundError: 
     print('File is not found')
 else:
     lines = file.readlines()
@@ -47,19 +52,19 @@ else:
                 x_source = x * z_source / z
                 y_source = y * z_source / z
 
-                theta2 = (math.pi / 2 - math.atan2(math.sqrt(x ** 2 + y ** 2), -z))
-                ry = [[math.cos(theta2), 0, math.sin(theta2)],
-                      [0, 1, 0],
-                      [-math.sin(theta2), 0, math.cos(theta2)]]
-                rx = [[1, 0, 0],
-                      [0, math.cos(theta2), -math.sin(theta2)],
-                      [0, math.sin(theta2), math.cos(theta2)]]
-                rz = [[math.cos(theta2), -math.sin(theta2), 0],
-                      [math.sin(theta2), math.cos(theta2), 0],
-                      [0, 0, 1]]
-                rx = np.array(rx)
-                ry = np.array(ry)
-                rz = np.array(rz)
+                # theta2 = (math.pi / 2 - math.atan2(math.sqrt(x ** 2 + y ** 2), -z))
+                # ry = [[math.cos(theta2), 0, math.sin(theta2)],
+                #       [0, 1, 0],
+                #       [-math.sin(theta2), 0, math.cos(theta2)]]
+                # rx = [[1, 0, 0],
+                #       [0, math.cos(theta2), -math.sin(theta2)],
+                #       [0, math.sin(theta2), math.cos(theta2)]]
+                # rz = [[math.cos(theta2), -math.sin(theta2), 0],
+                #       [math.sin(theta2), math.cos(theta2), 0],
+                #       [0, 0, 1]]
+                # rx = np.array(rx)
+                # ry = np.array(ry)
+                # rz = np.array(rz)
 
                 vectors[i][3] = -y
                 vectors[i][4] = -x
@@ -88,7 +93,7 @@ else:
                 # [vectors[i][9], vectors[i][10], vectors[i][11]] = np.matmul(ry.T, np.array([vectors[i][9], vectors[i][10], vectors[i][11]]))
 
                 i += 1
-                print(i)
+                # print(i)
 
 
 file.close()
@@ -142,12 +147,12 @@ class Virtual_Cbct():
 
         self.projectionGeometry = astra.create_proj_geom(
             'cone_vec',
-            self.detectorRows,
-            self.detectorColumns,
+            self.detectorRows//scale,
+            self.detectorColumns//scale,
             self.vectors,
         )
         self.vol_geom = astra.creators.create_vol_geom(
-            self.detectorColumns, self.detectorColumns, slices)
+            self.detectorColumns//scale, self.detectorColumns//scale, slices)
         # self.create_projections()
         self.create_reconstructions()
 
@@ -191,15 +196,20 @@ class Virtual_Cbct():
             shutil.rmtree(output_dir)
         os.makedirs(output_dir)
 
-        projections = np.zeros((self.detectorRows, self.numberOfProjections, self.detectorColumns))
+        projections = np.zeros((self.detectorRows//scale, self.numberOfProjections, self.detectorColumns//scale))
         for i in range(1, self.numberOfProjections+1):
+    
             im = imread(join(input_dir, 'Prep{}.png'.format(i))).astype(float)
             im /= np.max(im)
+            
+            h,w = im.shape
+
+            im = cv2.resize(im,(w//scale,h//scale))
+
             projections[:, i-1, :] = im
 
-        print(self.projectionGeometry["Vectors"][0])
-        # print(projections)
-        # print(self.vol_geom)
+
+        t_in = time.time()
 
         # Copy projection images into ASTRA Toolbox.
         projectionId = astra.data3d.create('-proj3d', self.projectionGeometry, projections)
@@ -211,11 +221,10 @@ class Virtual_Cbct():
         alg_cfg['ProjectionDataId'] = projectionId
         alg_cfg['ReconstructionDataId'] = reconstruction_id
         algorithm_id = astra.algorithm.create(alg_cfg)
-        astra.algorithm.run(algorithm_id)
+        astra.algorithm.run(algorithm_id, iteration)
         reconstruction = astra.data3d.get(reconstruction_id)
-
-        print(np.max(reconstruction))
-        print(reconstruction.shape)
+        
+        t_recon = time.time()
 
         # Limit and scale reconstruction.
         reconstruction[reconstruction < 0] = 0
@@ -229,16 +238,46 @@ class Virtual_Cbct():
         for i in range(slices):
             im = reconstruction[i, :, :]
             im = np.flipud(im)
+            
+            im = im.T
+            im = im[::-1,::-1]
+            
+            # im = black_edge(im)
+            
+            # im = cv2.resize(im,(w//scale,h//scale))
+
             a = np.max(im)
-            if a >0:
-                print(i, a)
-            imwrite(join(output_dir, 'reco%04d.tif' % i), im)
+            # if a >0:
+            #     print(i, a)
+            imwrite(join(output_dir, 'reco%04d.png' % i), im)
+        
+        t2 = time.time()
+        
+        print("overall time:{},input time:{},recon time:{},output time:{}".format(t2-t1,t_in-t1,t_recon-t_in,t2-t_recon))
 
         # Cleanup.
         astra.algorithm.delete(algorithm_id)
         astra.data3d.delete(reconstruction_id)
         astra.data3d.delete(projectionId)
 
+
+def black_edge(img):
+    
+    b = cv2.threshold(img, 3, 255, cv2.THRESH_BINARY)[1] #调整裁剪效果
+
+    edges_y, edges_x = np.where(b==255) ##h, w
+    bottom = min(edges_y)             
+    top = max(edges_y) 
+    height = top - bottom            
+                                   
+    left = min(edges_x)           
+    right = max(edges_x)             
+    height = top - bottom 
+    width = right - left
+
+    res_image = img[bottom:bottom+height, left:left+width]
+    
+    return res_image
 
 def main():
     recon = Virtual_Cbct()

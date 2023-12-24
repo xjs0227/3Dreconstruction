@@ -10,10 +10,11 @@ import math
 
 
 # PROJECTION_RESULTS = r'D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e4\3DReconLog_e4_23\data\resize(16)'
-PROJECTION_RESULTS = r'D:\study\graduate\research\Study\project\3Dreconstruction\method\virtual-cbct\output\dataset'
-RECONSTRUCTION_RESULTS = 'output/reconstruction'
+PROJECTION_RESULTS = '/home/hui/xjs/3Dreconstruction/data/phantom'
+RECONSTRUCTION_RESULTS = 'output/reconstruction/2'
+os.makedirs(RECONSTRUCTION_RESULTS, exist_ok=True)
 
-File = r"D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e4\3DReconLog_e4_23\Run76\Cal.txt"
+File = "/home/hui/xjs/3Dreconstruction/data/e5/Cal.txt"
 X_INIT = 3096
 Y_INIT = 3104
 
@@ -80,6 +81,15 @@ class Virtual_Cbct():
             self.distanceFromSourceToOrigin / self.pixelSize,
             self.distanceFromOriginToDetector / self.pixelSize
         )
+        # self.projectionGeometry = astra.create_proj_geom(
+        #     'cone', 1, 1,
+        #     self.detectorRows,
+        #     self.detectorColumns,
+        #     self.angles,
+        #     (self.distanceFromSourceToOrigin + self.distanceFromOriginToDetector)/ self.pixelSize,
+        #     0
+        # )
+
         self.vol_geom = astra.creators.create_vol_geom(
             self.detectorColumns, self.detectorColumns, self.detectorRows)
         # self.create_projections()

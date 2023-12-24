@@ -11,22 +11,42 @@ import astra
 import math
 
 # PROJECTION_RESULTS = r'D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e5\3DReconLog_e5_120\Run1'
-# File = r"D:\study\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e4\3DReconLog_e4_23\Run76\Cal.txt"
+# File = r"D:\st udy\graduate\research\Study\project\3Dreconstruction\3D重建\data\Temp-e4\3DReconLog_e4_23\Run76\Cal.txt"
 
-PROJECTION_RESULTS = "/home/hui/xjs/data/Run-partmokuai/3DReconLog-mokuai-60/Run1" # '/home/hui/xjs/data/3DReconLog_e5_120/Run1' # "data/e5"  # 
-File = "/home/hui/xjs/data/Run-partmokuai/3DReconLog-mokuai-60/Run1/Cal.txt" #"data/e5/Cal.txt"
+PROJECTION_RESULTS = "/home/hui/xjs/data/20231207/bga/3DReconLog/Run1"  # "data/e5"
+File = "/home/hui/xjs/data/20231207/bga/3DReconLog/Run1/Cal.txt" #"data/e5/Cal.txt"
 
-RECONSTRUCTION_RESULTS = "results/Run-partmokuai/3DReconLog-mokuai-60"
+RECONSTRUCTION_RESULTS = "/home/hui/xjs/3Dreconstruction/results/20231207/bga"
+os.makedirs(RECONSTRUCTION_RESULTS, exist_ok=True)
 
-t1 = time.time()
+# scale = 6
+# X_INIT = 3096
+# Y_INIT = 3104
+# n = 120
+# slices = 500
+# resol_cam = 9.4
+# r = 2
+# # resolution = resol_cam * scale 
+# resolution =  0.99 * 15.9 / resol_cam
+# iteration = 1
+
 scale = 6
 X_INIT = 3096
 Y_INIT = 3104
-n = 60
-slices = 100
-r = 3.5
-resolution = 0.99
-iteration = 5
+n = 120
+slices = 5
+resol_cam = 15.9
+# resolution = resol_cam * scale 
+resolution =  scale * 0.99 * 15.9 / resol_cam
+iteration = 1
+
+t1 = time.time()
+
+print("saved in:", RECONSTRUCTION_RESULTS)
+print("scale:", scale)
+print("resolution:", resolution)
+print("slices:", slices)
+print("iteration:", iteration)
 
 vectors = np.zeros((n, 12))
 try:
@@ -70,13 +90,13 @@ else:
                 vectors[i][4] = -x
                 vectors[i][5] = z
 
-                theta = math.atan2(abs(vectors[i][4]), abs(vectors[i][3]))
+                # theta = math.atan2(abs(vectors[i][4]), abs(vectors[i][3]))
 
                 vectors[i][0] = -y_source
                 vectors[i][1] = -x_source
                 vectors[i][2] = z_source
 
-                vectors[i][9] = resolution * r#math.cos(theta) * vectors[i][3] / abs(vectors[i][3]) * resolution * 6 #resolution * 6
+                vectors[i][9] = resolution# math.cos(theta) * vectors[i][3] / abs(vectors[i][3]) * resolution * 6 #resolution * 6
                 vectors[i][10] = 0#math.sin(theta) * vectors[i][4] / abs(vectors[i][4]) * resolution * 6 #resolution * 6
                 vectors[i][11] = 0
 
@@ -197,16 +217,20 @@ class Virtual_Cbct():
         os.makedirs(output_dir)
 
         projections = np.zeros((self.detectorRows//scale, self.numberOfProjections, self.detectorColumns//scale))
+        j = 1
         for i in range(1, self.numberOfProjections+1):
-    
-            im = imread(join(input_dir, 'Prep{}.png'.format(i))).astype(float)
+            path = join(input_dir, 'Prep{}.png'.format(i))
+            if not os.path.exists(path):
+                continue
+            im = imread(path).astype(float)
             im /= np.max(im)
             
             h,w = im.shape
 
             im = cv2.resize(im,(w//scale,h//scale))
 
-            projections[:, i-1, :] = im
+            projections[:, j-1, :] = im
+            j += 1
 
 
         t_in = time.time()
@@ -224,6 +248,8 @@ class Virtual_Cbct():
         astra.algorithm.run(algorithm_id, iteration)
         reconstruction = astra.data3d.get(reconstruction_id)
         
+        print("reconstruction finished")
+
         t_recon = time.time()
 
         # Limit and scale reconstruction.
@@ -231,16 +257,15 @@ class Virtual_Cbct():
         reconstruction /= np.max(reconstruction)
         reconstruction = np.round(reconstruction * 255).astype(np.uint8)
 
-        # print(reconstruction)
-        # print(reconstruction[250][250][:])
 
         # Save reconstruction.
         for i in range(slices):
             im = reconstruction[i, :, :]
             im = np.flipud(im)
             
+            # im = im.T
+            # im = im[::-1,::-1]
             im = im.T
-            im = im[::-1,::-1]
             
             # im = black_edge(im)
             
